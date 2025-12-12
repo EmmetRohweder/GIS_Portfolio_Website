@@ -204,6 +204,15 @@
     .muted{color:var(--muted)}
     a.no-underline{text-decoration:none;color:inherit}
   </style>
+
+  <!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Leaflet Slider Plugin -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.js"></script>
+
 </head>
 <body>
   <main class="wrap" id="top">
@@ -280,18 +289,8 @@
       <div class="grid" id="projectGrid">
         <!-- Project 1 -->
         <article class="card reveal" data-delay="250" tabindex="0" aria-labelledby="p1-title">
-          <div class="thumb" aria-hidden="true">
-            <!-- simple SVG placeholder -->
-            <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="120" height="80" rx="8" fill="url(#g)"/>
-              <defs>
-                <linearGradient id="g" x1="0" x2="1">
-                  <stop offset="0" stop-color="#eef2ff"/>
-                  <stop offset="1" stop-color="#f8fafc"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
+        <div class="thumb" id="imperviousMap" style="height:200px; border-radius:10px; overflow:hidden;"></div>
+
           <h3 id="p1-title">Portfolio Template</h3>
           <p>An ultra-light starter portfolio. Clean grid layout, accessible, and easy to customize.</p>
           <div class="meta">
@@ -461,6 +460,80 @@
     }
 
     // Accessibility: focus trap not implemented (keep modal simple).
+
+    // ------------------------
+// IMPERVIOUS MAP + SLIDER
+// ------------------------
+
+document.addEventListener('DOMContentLoaded', function () {
+  // Create the Leaflet map
+  const map = L.map('imperviousMap', {
+    center: [43.6, -116.2],   // Change to your study area
+    zoom: 11,
+    zoomControl: false
+  });
+
+  // Years you have tiles for
+  const YEARS = [2001, 2006, 2011, 2016, 2021];
+
+  // A dictionary of tile layers
+  const imperviousLayers = {};
+
+  YEARS.forEach(year => {
+    imperviousLayers[year] = L.tileLayer(
+      `tiles/impervious/${year}/{z}/{x}/{y}.png`,
+      {
+        maxZoom: 16,
+        opacity: 0.9,
+        noWrap: true
+      }
+    );
+  });
+
+  // Start by loading the first year
+  imperviousLayers[YEARS[0]].addTo(map);
+
+  // -------- SLIDER UI --------
+  const slider = document.createElement('div');
+  slider.id = "yearSlider";
+  slider.style.margin = "10px";
+
+  // Add slider to map
+  const sliderControl = L.control({ position: 'bottomleft' });
+
+  sliderControl.onAdd = function () {
+    return slider;
+  };
+
+  sliderControl.addTo(map);
+
+  // Create slider widget
+  noUiSlider.create(slider, {
+    start: [0],
+    step: 1,
+    range: {
+      min: 0,
+      max: YEARS.length - 1
+    },
+    tooltips: true,
+    format: {
+      to: i => YEARS[i | 0],
+      from: i => YEARS.indexOf(parseInt(i))
+    }
+  });
+
+  // When slider moves → update tiles
+  slider.noUiSlider.on('update', function (values) {
+    const year = parseInt(values[0]);
+
+    // Remove all layers
+    YEARS.forEach(y => map.removeLayer(imperviousLayers[y]));
+
+    // Add the requested year layer
+    imperviousLayers[year].addTo(map);
+  });
+});
+    
   </script>
 </body>
 </html>
