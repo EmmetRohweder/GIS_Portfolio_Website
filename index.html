@@ -287,23 +287,24 @@
       <h2 class="reveal" data-delay="200">Projects</h2>
 
       <div class="grid" id="projectGrid">
-        <!-- Project 1 -->
-        <article class="card reveal" data-delay="250" tabindex="0" aria-labelledby="p1-title">
-        <div class="thumb" id="imperviousMap" style="height:200px; border-radius:10px; overflow:hidden;"></div>
+        <!-- Project 1: Impervious Surface Map -->
+<article class="card reveal" data-delay="250" tabindex="0" aria-labelledby="p1-title">
+  <div class="thumb" id="imperviousMap" style="height:200px; border-radius:10px; overflow:hidden;"></div>
 
-          <h3 id="p1-title">Portfolio Template</h3>
-          <p>An ultra-light starter portfolio. Clean grid layout, accessible, and easy to customize.</p>
-          <div class="meta">
-            <div class="tags">
-              <span class="tag-pill">HTML</span>
-              <span class="tag-pill">CSS</span>
-              <span class="tag-pill">Vanilla JS</span>
-            </div>
-            <div>
-              <a class="btn" href="#" onclick="openProject(event,1)">View</a>
-            </div>
-          </div>
-        </article>
+  <h3 id="p1-title">Impervious Surface Map</h3>
+  <p>Interactive map of impervious surface cover over years. Use the slider to view changes.</p>
+  <div class="meta">
+    <div class="tags">
+      <span class="tag-pill">Map</span>
+      <span class="tag-pill">Leaflet</span>
+      <span class="tag-pill">JavaScript</span>
+    </div>
+    <div>
+      <a class="btn" href="#" onclick="openImperviousMap(event)">View</a>
+    </div>
+  </div>
+</article>
+
 
         <!-- Project 2 -->
         <article class="card reveal" data-delay="300" tabindex="0" aria-labelledby="p2-title">
@@ -535,5 +536,168 @@ document.addEventListener('DOMContentLoaded', function () {
 });
     
   </script>
+
+  <!-- Fullscreen Impervious Surface Map Modal -->
+<div id="imperviousModal" role="dialog" aria-modal="true" aria-hidden="true" style="position:fixed;inset:0;display:none;place-items:center;padding:24px;z-index:999;">
+  <div style="position:absolute;inset:0;background:rgba(8,10,16,0.45)"></div>
+  <div role="document" style="position:relative;z-index:2;background:white;border-radius:12px;max-width:90%;width:100%;height:80%;padding:10px;display:flex;flex-direction:column;">
+    <button onclick="closeImperviousMap()" class="btn" style="align-self:flex-end;margin-bottom:4px;">Close</button>
+    <div id="imperviousMapFull" style="flex:1;border-radius:8px;"></div>
+  </div>
+</div>
+
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  // -----------------------------------------------------
+  // SMALL MAP IN PROJECT CARD
+  // -----------------------------------------------------
+  const smallMap = L.map('imperviousMap', {
+    center: [43.6, -116.2],
+    zoom: 11,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(smallMap);
+
+  // Small impervious preview (first year)
+  const YEARS = [2001, 2006, 2011, 2016, 2021];
+  const smallImpervLayer = L.tileLayer(`impervious/${YEARS[0]}/{z}/{x}/{y}.png`, {
+    maxZoom: 16,
+    minZoom: 8,
+    opacity: 0.9,
+    noWrap: true
+  }).addTo(smallMap);
+
+
+  // -----------------------------------------------------
+  //   FULLSCREEN MAP MODAL LOGIC
+  // -----------------------------------------------------
+  let fullMap = null;
+  let impervLayers = {};
+
+  window.openImperviousMap = function (e) {
+    e.preventDefault();
+    const modal = document.getElementById('imperviousModal');
+    modal.style.display = 'grid';
+    modal.setAttribute('aria-hidden', 'false');
+
+    setTimeout(() => {
+      if (!fullMap) {
+
+        // -----------------------------------------------------
+        //   BUILD FULL MAP
+        // -----------------------------------------------------
+        fullMap = L.map('imperviousMapFull', {
+          center: [43.6, -116.2],
+          zoom: 11
+        });
+
+        // Base map
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(fullMap);
+
+        // Impervious layers for all years
+        YEARS.forEach(year => {
+          impervLayers[year] = L.tileLayer(`impervious/${year}/{z}/{x}/{y}.png`, {
+            maxZoom: 16,
+            minZoom: 8,
+            opacity: 0.9,
+            noWrap: true
+          });
+        });
+
+        // Start with first year
+        impervLayers[YEARS[0]].addTo(fullMap);
+
+        // -----------------------------------------------------
+        //   SCALE BAR
+        // -----------------------------------------------------
+        L.control.scale({ position: 'bottomleft' }).addTo(fullMap);
+
+        // -----------------------------------------------------
+        //   LEGEND CONTROL
+        // -----------------------------------------------------
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function () {
+          const div = L.DomUtil.create('div', 'legend');
+          div.style.background = "white";
+          div.style.padding = "10px 12px";
+          div.style.borderRadius = "8px";
+          div.style.boxShadow = "0 0 10px rgba(0,0,0,0.2)";
+          div.innerHTML = `
+            <strong>Impervious Surface (%)</strong><br>
+            <div style="display:flex;align-items:center;margin-top:6px;">
+              <div style="width:20px;height:20px;background:#d73027;margin-right:6px;"></div> High
+            </div>
+            <div style="display:flex;align-items:center;margin-top:3px;">
+              <div style="width:20px;height:20px;background:#fc8d59;margin-right:6px;"></div> Medium
+            </div>
+            <div style="display:flex;align-items:center;margin-top:3px;">
+              <div style="width:20px;height:20px;background:#fee08b;margin-right:6px;"></div> Low
+            </div>
+          `;
+          return div;
+        };
+        legend.addTo(fullMap);
+
+        // -----------------------------------------------------
+        //   YEAR SLIDER CONTROL
+        // -----------------------------------------------------
+        const slider = L.control({ position: 'topright' });
+        slider.onAdd = function () {
+          const div = L.DomUtil.create('div', 'sliderControl');
+          div.style.background = "white";
+          div.style.padding = "10px";
+          div.style.borderRadius = "8px";
+          div.style.boxShadow = "0 0 10px rgba(0,0,0,0.2)";
+          div.innerHTML = `
+            <label style="font-weight:bold;">Year</label><br>
+            <input id="yearSlider" type="range" min="0" max="${YEARS.length - 1}" step="1" value="0">
+            <span id="yearLabel">${YEARS[0]}</span>
+          `;
+          return div;
+        };
+        slider.addTo(fullMap);
+
+        // Slider behavior: swap tile layers
+        const yearSlider = document.getElementById('yearSlider');
+        const yearLabel = document.getElementById('yearLabel');
+
+        yearSlider.addEventListener('input', function () {
+          const index = parseInt(this.value);
+          const year = YEARS[index];
+          yearLabel.textContent = year;
+
+          // Remove all layers
+          YEARS.forEach(y => fullMap.removeLayer(impervLayers[y]));
+          // Add selected year
+          impervLayers[year].addTo(fullMap);
+        });
+
+      } else {
+        fullMap.invalidateSize();
+      }
+    }, 50);
+  };
+
+
+  // -----------------------------------------------------
+  // CLOSE FULLSCREEN MAP
+  // -----------------------------------------------------
+  window.closeImperviousMap = function () {
+    const modal = document.getElementById('imperviousModal');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  };
+
+});
+</script>
+
+  
 </body>
 </html>
